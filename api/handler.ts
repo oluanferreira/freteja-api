@@ -39,7 +39,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     res.send(response.body);
   } catch (err) {
-    res.status(500).json({ statusCode: 500, error: "boot_failed" });
+    res.status(500).json({ statusCode: 500, error: "boot_failed", detail: String((err as Error)?.message || err).slice(0, 300) });
   }
 }
 
