@@ -1,0 +1,21 @@
+{
+  "name": "@freteja/shared",
+  "version": "0.1.0",
+  "private": true,
+  "description": "FreteJá Shared - Types, constants, utilities",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "lint": "eslint src/",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test src/**/*.test.ts"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "eslint": "^9.17.0",
+    "@eslint/js": "^9.17.0",
+    "tsx": "^4.19.0",
+    "typescript-eslint": "^8.18.0"
+  }
+}
