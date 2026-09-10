@@ -2,6 +2,17 @@ import Fastify, { type FastifyError } from 'fastify';
 import cors from '@fastify/cors';
 import fastifyEnv from '@fastify/env';
 import sensible from '@fastify/sensible';
+import databasePlugin from './plugins/database';
+import jwtPlugin from './plugins/jwt';
+import authRoutes from './modules/auth/auth.routes';
+import ridesRoutes from './modules/rides/rides.routes';
+import proposalsRoutes from './modules/proposals/proposals.routes';
+import trackingRoutes from './modules/tracking/tracking.routes';
+import paymentsRoutes from './modules/payments/payments.routes';
+import chatRoutes from './modules/chat/chat.routes';
+import ratingsRoutes from './modules/ratings/ratings.routes';
+import notificationsRoutes from './modules/notifications/notifications.routes';
+import socketPlugin from './plugins/socket';
 
 // Env schema validation
 const envSchema = {
@@ -65,50 +76,39 @@ const buildServer = async () => {
   await registerPlugin(sensible);
 
   // Database (PostgreSQL + PostGIS)
-  const databasePlugin = await import('./plugins/database');
-  await registerPlugin(databasePlugin.default);
+  await registerPlugin(databasePlugin);
 
   // JWT Auth
-  const jwtPlugin = await import('./plugins/jwt');
-  await registerPlugin(jwtPlugin.default);
+  await registerPlugin(jwtPlugin);
 
   // Auth routes
-  const authRoutes = await import('./modules/auth/auth.routes');
-  await registerPlugin(authRoutes.default);
+  await registerPlugin(authRoutes);
 
   // Rides routes
-  const ridesRoutes = await import('./modules/rides/rides.routes');
-  await registerPlugin(ridesRoutes.default);
+  await registerPlugin(ridesRoutes);
 
   // Proposals routes
-  const proposalsRoutes = await import('./modules/proposals/proposals.routes');
-  await registerPlugin(proposalsRoutes.default);
+  await registerPlugin(proposalsRoutes);
 
   // Tracking routes (ride status + GPS)
-  const trackingRoutes = await import('./modules/tracking/tracking.routes');
-  await registerPlugin(trackingRoutes.default);
+  await registerPlugin(trackingRoutes);
 
   // Payment & wallet routes
-  const paymentsRoutes = await import('./modules/payments/payments.routes');
-  await registerPlugin(paymentsRoutes.default);
+  await registerPlugin(paymentsRoutes);
 
   // Chat routes
-  const chatRoutes = await import('./modules/chat/chat.routes');
-  await registerPlugin(chatRoutes.default);
+  await registerPlugin(chatRoutes);
 
   // Ratings routes
-  const ratingsRoutes = await import('./modules/ratings/ratings.routes');
-  await registerPlugin(ratingsRoutes.default);
+  await registerPlugin(ratingsRoutes);
 
   // Notifications routes
-  const notificationsRoutes = await import('./modules/notifications/notifications.routes');
-  await registerPlugin(notificationsRoutes.default);
+  await registerPlugin(notificationsRoutes);
 
   // Socket.IO (realtime: /tracking, /chat) — skipped on serverless (Vercel).
   // Realtime moves to Supabase Realtime; REST (chat history, GPS posts) keeps working.
   if (process.env.VERCEL !== "1" && process.env.DISABLE_SOCKETS !== "true") {
-    const socketPlugin = await import('./plugins/socket');
-    await registerPlugin(socketPlugin.default);
+    await registerPlugin(socketPlugin);
   }
 
   // Global error handler
