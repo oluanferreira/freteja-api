@@ -1,11 +1,11 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type { FastifyInstance } from "fastify";
+import { buildServer } from "../src/server";
 
 let app: FastifyInstance | null = null;
 
 async function getApp(): Promise<FastifyInstance> {
   if (app) return app;
-  const { buildServer } = await import("../src/server");
   app = await buildServer();
   await app.ready();
   return app;
