@@ -37,7 +37,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     for (const [key, value] of Object.entries(response.headers)) {
       if (value !== undefined) res.setHeader(key, value as string | string[]);
     }
-    res.send(response.rawBody ?? response.body);
+    res.send(response.body);
   } catch (err) {
     res.status(500).json({ statusCode: 500, error: "boot_failed" });
   }
