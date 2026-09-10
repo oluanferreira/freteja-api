@@ -1,4 +1,5 @@
 import { type FastifyInstance } from 'fastify';
+import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { calculateSuggestedPrice } from '@freteja/shared';
 import type { VehicleType } from '@freteja/shared';
 
@@ -14,6 +15,7 @@ interface CreateRideBody {
   weight_range?: string;
   volume_range?: string;
   vehicle_type_preferred?: VehicleType;
+  needs_helper?: boolean;
   notes?: string;
   scheduled_at?: string;
   schedule_window_minutes?: number;
@@ -44,7 +46,7 @@ export default async function ridesRoutes(fastify: FastifyInstance): Promise<voi
       origin_address, origin_lat, origin_lng,
       destination_address, destination_lat, destination_lng,
       cargo_description, cargo_category, weight_range, volume_range,
-      vehicle_type_preferred, notes, scheduled_at, schedule_window_minutes,
+      vehicle_type_preferred, needs_helper, notes, scheduled_at, schedule_window_minutes,
     } = request.body;
 
     if (!origin_address || !destination_address || !cargo_description ||
@@ -73,15 +75,15 @@ export default async function ridesRoutes(fastify: FastifyInstance): Promise<voi
       `INSERT INTO rides (
         embarcador_id, origin_address, origin_location, destination_address, destination_location,
         cargo_description, cargo_category, weight_range, volume_range,
-        vehicle_type_preferred, notes, suggested_price, scheduled_at, schedule_window_minutes
+        vehicle_type_preferred, needs_helper, notes, suggested_price, scheduled_at, schedule_window_minutes
       ) VALUES (
         $1, $2, ST_MakePoint($3, $4)::geography, $5, ST_MakePoint($6, $7)::geography,
-        $8, $9, $10, $11, $12, $13, $14, $15, $16
+        $8, $9, $10, $11, $12, $13, $14, $15, $16, $17
       ) RETURNING id, status, suggested_price, created_at`,
       [
         userId, origin_address, origin_lng, origin_lat, destination_address, destination_lng, destination_lat,
         cargo_description, cargo_category || null, weight_range || null, volume_range || null,
-        vehicle_type_preferred || null, notes || null, suggestedPrice, scheduled_at || null, schedule_window_minutes || null,
+        vehicle_type_preferred || null, Boolean(needs_helper), notes || null, suggestedPrice, scheduled_at || null, schedule_window_minutes || null,
       ]
     );
 
@@ -220,5 +222,53 @@ export default async function ridesRoutes(fastify: FastifyInstance): Promise<voi
     );
 
     return reply.send({ message: 'Frete cancelado', ride_id: id });
+  });
+
+  // PATCH /api/rides/:id/photos — Append cargo photos (embarcador only).
+  // Body: { photos: string[] } with data URLs. Uploaded server-side to
+  // Supabase storage (service role) so the app never holds secrets.
+  fastify.patch<{ Params: RideParams; Body: { photos?: string[] } }>('/api/rides/:id/photos', {
+    onRequest: [fastify.authenticate],
+  }, async (request, reply) => {
+    const { id } = request.params;
+    const userId = request.user.sub;
+    const photos = Array.isArray(request.body?.photos) ? request.body.photos.slice(0, 3) : [];
+    if (!photos.length) {
+      return reply.status(400).send({ statusCode: 400, error: 'Bad Request', message: 'Nenhuma foto enviada' });
+    }
+    const ride = await fastify.db.query('SELECT id, embarcador_id FROM rides WHERE id = $1', [id]);
+    if (ride.rows.length === 0) {
+      return reply.status(404).send({ statusCode: 404, error: 'Not Found', message: 'Frete nao encontrado' });
+    }
+    if (ride.rows[0].embarcador_id !== userId) {
+      return reply.status(403).send({ statusCode: 403, error: 'Forbidden', message: 'Apenas o embarcador pode anexar fotos' });
+    }
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supabaseUrl || !serviceKey) {
+      return reply.status(500).send({ statusCode: 500, error: 'storage_unconfigured' });
+    }
+    const supabase = createSupabaseClient(supabaseUrl, serviceKey);
+    const urls: string[] = [];
+    for (const [index, dataUrl] of photos.entries()) {
+      const match = /^data:(image\/[a-zA-Z+]+);base64,(.+)$/.exec(dataUrl || '');
+      if (!match) continue;
+      const ext = match[1].split('/')[1].replace('jpeg', 'jpg');
+      const buffer = Buffer.from(match[2], 'base64');
+      if (buffer.length > 3 * 1024 * 1024) continue;
+      const path = `${id}/${Date.now()}-${index}.${ext}`;
+      const { error } = await supabase.storage.from('frete-cargas').upload(path, buffer, { contentType: match[1], upsert: false });
+      if (error) continue;
+      const { data } = supabase.storage.from('frete-cargas').getPublicUrl(path);
+      if (data?.publicUrl) urls.push(data.publicUrl);
+    }
+    if (!urls.length) {
+      return reply.status(400).send({ statusCode: 400, error: 'Bad Request', message: 'Nenhuma foto valida' });
+    }
+    await fastify.db.query(
+      'UPDATE rides SET cargo_photo_urls = coalesce(cargo_photo_urls, \'{}\') || $2 WHERE id = $1',
+      [id, urls]
+    );
+    return reply.send({ ride_id: id, photo_urls: urls });
   });
 }

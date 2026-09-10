@@ -2,7 +2,7 @@
   "name": "@freteja/api",
   "version": "0.1.0",
   "private": true,
-  "description": "FreteJ\u00e1 API - Fastify Backend",
+  "description": "FreteJá API - Fastify Backend",
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
@@ -20,6 +20,7 @@
     "@fastify/env": "^5.0.3",
     "@fastify/jwt": "^10.0.0",
     "@fastify/sensible": "^6.0.4",
+    "@supabase/supabase-js": "^2.116.0",
     "bcryptjs": "^3.0.3",
     "fastify": "^5.2.1",
     "fastify-plugin": "^5.1.0",
