@@ -16,6 +16,12 @@ async function databasePlugin(fastify: FastifyInstance): Promise<void> {
     connectionTimeoutMillis: 5000,
   });
 
+  // Serverless pooler (Supavisor, transaction mode) ignores `options=-csearch_path`
+  // in DATABASE_URL, so pin the schema on every physical connection instead.
+  pool.on('connect', (client) => {
+    client.query('SET search_path TO freteja, public, extensions').catch(() => undefined);
+  });
+
   // Test connection
   let client: PoolClient | undefined;
   try {
